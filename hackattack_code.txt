@@ -1,0 +1,95 @@
+import os
+import cv2
+import numpy as np
+def generate_dataset(img, id, img_id):
+    cv2.imwrite("data/user."+str(id)+"."+str(img_id)+".jpg", img)
+# Create a directory (if not exists) for any output if needed
+directory = "C:/Users/sreeh/PycharmProjects/PythonProject/new_folder"
+os.makedirs(directory, exist_ok=True)
+print("Directory created!")
+
+# Paths to Haar cascades
+face_cascade_path = "haarcascade_frontalface_default.xml"
+eye_cascade_path = "haarcascade_eye.xml"
+nose_cascade_path = "haarcascade_mcs_nose.xml"
+mouth_cascade_path = "haarcascade_mcs_mouth.xml"
+
+# Load Haar cascades
+face_cascade = cv2.CascadeClassifier(face_cascade_path)
+eye_cascade = cv2.CascadeClassifier(eye_cascade_path)
+nose_cascade = cv2.CascadeClassifier(nose_cascade_path)
+mouth_cascade = cv2.CascadeClassifier(mouth_cascade_path)
+
+# Check if Haar cascades were loaded correctly
+if face_cascade.empty() or eye_cascade.empty() or nose_cascade.empty() or mouth_cascade.empty():
+    print("Error: One or more Haar cascade files could not be loaded.")
+    exit()
+
+
+def draw_boundary(img, classifier, scale_factor, min_neighbors, color, text):
+    """
+    Draws a rectangle around detected features and adds a label.
+    """
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    features = classifier.detectMultiScale(gray_img, scale_factor, min_neighbors)
+    coords = []
+    for (x, y, w, h) in features:
+        cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
+        cv2.putText(img, text, (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 1, cv2.LINE_AA)
+        coords = [x, y, w, h]
+    return coords
+
+
+def detect(img, face_cascade, eye_cascade, nose_cascade, mouth_cascade, img_id):
+    """
+    Detects faces and their features (eyes, nose, mouth) in the image.
+    """
+    color_map = {
+        "blue": (255, 255, 0),
+        "red": (0, 0, 255),
+        "green": (0, 255, 0),
+        "white": (255, 255, 255)
+    }
+
+    # Detect faces
+    coords = draw_boundary(img, face_cascade, 1.1, 10, color_map["blue"], "Face")
+
+    if len(coords) == 4:  # If a face is detected
+        roi_img = img[coords[1]:coords[1] + coords[3], coords[0]:coords[0] + coords[2]]
+
+        user_id = 1
+        generate_dataset(roi_img, user_id, img_id)
+        # Detect eyes, nose, and mouth within the face ROI
+        draw_boundary(roi_img, eye_cascade, 1.1, 14, color_map["red"], "Eyes")
+        draw_boundary(roi_img, nose_cascade, 1.1, 5, color_map["green"], "Nose")
+        draw_boundary(roi_img, mouth_cascade, 1.1, 20, color_map["white"], "Mouth")
+
+    return img
+
+
+# Initialize webcam
+video_capture = cv2.VideoCapture(0)
+
+
+img_id = 0
+while True:
+    # Capture frame-by-frame
+    ret, img = video_capture.read()
+
+    if not ret:
+        print("Error: Could not read from webcam.")
+        break
+
+    # Detect features in the current frame
+    img = detect(img, face_cascade, eye_cascade, nose_cascade, mouth_cascade, img_id)
+
+    # Display the resulting frame
+    cv2.imshow("Face Detection", img)
+
+    # Break loop on 'q' key press
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the capture and close windows
+video_capture.release()
+cv2.destroyAllWindows()
